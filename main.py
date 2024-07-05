@@ -14,7 +14,7 @@ To-Do приложение:
 
 uvicorn main:app --reload
 """
-from fastapi import FastAPI, Body, status
+from fastapi import FastAPI, Body, status, Path
 import uuid
 from typing import Dict, List
 from sqlalchemy import create_engine
@@ -41,6 +41,15 @@ class TasksBase(Base):
     description = Column(String)
 
 
+regex = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+
+class Task(BaseModel):
+    id: str
+    header: str
+    description: str
+
+
 # создаем таблицы
 Base.metadata.create_all(bind=engine)
 
@@ -54,7 +63,6 @@ app = FastAPI()
 
 @app.post(
     "/api/tasks/new",
-    status_code=status.HTTP_201_CREATED,
     tags=["Tasks"],
     summary="Создание новых задач"
 )
@@ -70,12 +78,11 @@ def create_task(
     print(f"Создана задача {task.id}: {task.header}- {task.description}")
     db.add(task)
     db.commit()
-
-
-class Task(BaseModel):
-    id: str
-    header: str
-    description: str
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"detail": "Успешное создание"},
+        media_type="application/json"
+    )
 
 
 @app.get(
@@ -104,5 +111,43 @@ def get_all_tasks() -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=all_tasks,
+        media_type="application/json"
+    )
+
+
+@app.put(
+    "/api/tasks/{id}",
+    tags=["Tasks"],
+    summary="Изменение конкретной задачи по id"
+)
+def update_task(
+        id: str = Path(pattern=regex),
+        header: str = Body(embed=True, min_length=3),
+        description: str = Body(embed=True, min_length=3)
+):
+    """
+    Получение по id задачи и изменение данных этой задачи
+    """
+    # получение одного объекта по id
+    task = db.get(TasksBase, id)
+    if not task:
+        print("Не найдено задачи с таким id")
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "Не найдено задачи с таким id"},
+            media_type="application/json"
+        )
+    print(f"Получена задача {task.id}: {task.header}- {task.description}")
+
+    # изменениям значения
+    task.header = header
+    task.description = description
+
+    db.commit()
+    print("Успешное изменение")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"detail": "Успешное изменение"},
         media_type="application/json"
     )
