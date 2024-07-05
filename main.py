@@ -62,7 +62,7 @@ app = FastAPI()
 
 
 @app.post(
-    "/api/tasks/new",
+    "/api/tasks",
     tags=["Tasks"],
     summary="Создание новых задач"
 )
@@ -149,5 +149,38 @@ def update_task(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"detail": "Успешное изменение"},
+        media_type="application/json"
+    )
+
+
+@app.delete(
+    "/api/tasks/{id}",
+    tags=["Tasks"],
+    summary="Удаление конкретной задачи по id"
+)
+def update_task(id: str = Path(pattern=regex)):
+    """
+    Получение по id задачи и удаление этой задачи
+    """
+    # получение одного объекта по id
+    task = db.query(TasksBase).filter(TasksBase.id == id).first()
+    if not task:
+        print("Не найдено задачи с таким id")
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "Не найдено задачи с таким id"},
+            media_type="application/json"
+        )
+    print(f"Получена задача {task.id}: {task.header}- {task.description}")
+
+    # удаляем объект
+
+    db.delete(task)
+    db.commit()
+    print("Успешное удаление")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"detail": "Успешное удаление"},
         media_type="application/json"
     )
