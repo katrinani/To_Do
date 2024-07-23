@@ -174,3 +174,47 @@ def update_task(id: str = Path(pattern=REGEX_UUID)):
             content={"detail": "Успешное удаление"},
             media_type="application/json"
         )
+
+
+@app.put(
+    "/api/tasks/{id}/done",
+    tags=["Tasks"],
+    summary="Указание состояние выполнения задачи по id"
+)
+def is_done(
+        id: str = Path(pattern=REGEX_UUID),
+        is_done: bool = Body(embed=True)  # , pattern='true|false'
+):
+    """
+    Получение по id задачи и изменение состояния выполненности этой задачи
+    """
+    with SessionLocal() as db:
+        # получение одного объекта по id
+        task = db.get(TasksBase, id)
+        if not task:
+            print("Не найдено задачи с таким id")
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"detail": "Не найдено задачи с таким id"},
+                media_type="application/json"
+            )
+        print(f"Получена задача {task.id}: {task.header}- {task.description}")
+
+        if is_done not in [True, False]:
+            print("Значение не является булевым (True/False)")
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": "Значение не является булевым (True/False)"},
+                media_type="application/json"
+            )
+        # изменениям значения
+        task.done = is_done
+
+        db.commit()
+        print("Успешное изменение")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"detail": "Успешное изменение"},
+            media_type="application/json"
+        )
