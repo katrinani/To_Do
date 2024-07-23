@@ -9,10 +9,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///././base/sql_app.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-
-
 class Base(DeclarativeBase):
     pass
 
@@ -24,6 +20,7 @@ class TasksBase(Base):
     header = Column(String)
     description = Column(String)
     done = Column(Boolean)
+    is_deleted = Column(Boolean)
 
 
 REGEX_UUID = r'[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}'
@@ -35,14 +32,13 @@ class Task(BaseModel):
     description: str
 
 
+SQLALCHEMY_DATABASE_URL = "sqlite:///././base/sql_app.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 # создаем таблицы
 Base.metadata.create_all(bind=engine)
 
 # создаем сессию подключения к бд
 SessionLocal = sessionmaker(autoflush=False, bind=engine)
-# db = SessionLocal()
-
-
 app = FastAPI()
 
 
@@ -60,7 +56,13 @@ def create_task(
     """
     with SessionLocal() as db:
         # добавляем в бд
-        task = TasksBase(id=str(uuid.uuid4()), header=header, description=description, done=False)
+        task = TasksBase(
+            id=str(uuid.uuid4()),
+            header=header,
+            description=description,
+            done=False,
+            is_deleted=False
+        )
         print(f"Создана задача {task.id}: {task.header}- {task.description}")
         db.add(task)
         db.commit()
@@ -84,7 +86,7 @@ def get_all_tasks() -> JSONResponse:
     """
     with SessionLocal() as db:
         # запрос в бд
-        tasks = db.query(TasksBase).all()
+        tasks = db.query(TasksBase).filter(TasksBase.is_deleted == False)
         print(tasks)
         # создание ответа
         all_tasks = {"tasks": []}
@@ -132,7 +134,6 @@ def update_task(
         # изменениям значения
         task.header = header
         task.description = description
-
         db.commit()
         print("Успешное изменение")
 
@@ -165,7 +166,7 @@ def update_task(id: str = Path(pattern=REGEX_UUID)):
         print(f"Получена задача {task.id}: {task.header}- {task.description}")
 
         # удаляем объект
-        db.delete(task)
+        task.is_deleted = True
         db.commit()
         print("Успешное удаление")
 
@@ -218,3 +219,4 @@ def is_done(
             content={"detail": "Успешное изменение"},
             media_type="application/json"
         )
+
