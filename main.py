@@ -4,7 +4,7 @@ from typing import Dict, List
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Boolean
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -23,9 +23,10 @@ class TasksBase(Base):
     id = Column(String, primary_key=True)
     header = Column(String)
     description = Column(String)
+    done = Column(Boolean)
 
 
-REGEX_UUID = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+REGEX_UUID = r'[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}'
 
 
 class Task(BaseModel):
@@ -59,7 +60,7 @@ def create_task(
     """
     with SessionLocal() as db:
         # добавляем в бд
-        task = TasksBase(id=str(uuid.uuid4()), header=header, description=description)
+        task = TasksBase(id=str(uuid.uuid4()), header=header, description=description, done=False)
         print(f"Создана задача {task.id}: {task.header}- {task.description}")
         db.add(task)
         db.commit()
@@ -84,13 +85,15 @@ def get_all_tasks() -> JSONResponse:
     with SessionLocal() as db:
         # запрос в бд
         tasks = db.query(TasksBase).all()
+        print(tasks)
         # создание ответа
         all_tasks = {"tasks": []}
         for task in tasks:
             all_tasks["tasks"].append({
                 "id": task.id,
                 "header": task.header,
-                "description": task.description
+                "description": task.description,
+                "is_done": task.done
                 }
             )
         print(all_tasks)
@@ -162,7 +165,6 @@ def update_task(id: str = Path(pattern=REGEX_UUID)):
         print(f"Получена задача {task.id}: {task.header}- {task.description}")
 
         # удаляем объект
-
         db.delete(task)
         db.commit()
         print("Успешное удаление")
